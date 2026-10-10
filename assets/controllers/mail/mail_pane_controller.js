@@ -224,6 +224,15 @@ export default class extends Controller {
             this._showList();
         };
         document.addEventListener("turbo:frame-load", this._onListSwap);
+        // Turbo replaces frame contents, preserving the outer element's data.
+        // Actions and live refresh must use the incoming view's descriptor.
+        this._onListRendering = (event) => {
+            if (LIST_FRAME_ID === event.target.id) {
+                this._copyListContext(event.target, event.detail.newFrame);
+            }
+        };
+        document.addEventListener("turbo:before-frame-render", this._onListRendering);
+
 
         // A refresh that came due while the tab was in the background is held
         // rather than dropped, and taken the moment it is looked at again.
@@ -279,6 +288,7 @@ export default class extends Controller {
         document.removeEventListener("reading-split:layout", this._onSplitLayout);
         this._selectionObserver?.disconnect();
         document.removeEventListener("turbo:frame-load", this._onListSwap);
+        document.removeEventListener("turbo:before-frame-render", this._onListRendering);
         document.removeEventListener("visibilitychange", this._onVisibility);
 
         // A trailing refresh outlives this controller otherwise: Turbo replaces
@@ -842,7 +852,7 @@ export default class extends Controller {
             // Carried over with the content: the response says whether it
             // actually rendered a list, and _listNeedsRendering() reads it back
             // off the live frame on the next Back.
-            frame.dataset.listRendered = fresh.dataset.listRendered ?? "1";
+            this._copyListContext(frame, fresh);
         } catch (error) {
             // A failed refresh is not worth surfacing: the next sync event, or
             // the next navigation, redraws it anyway.
@@ -861,6 +871,12 @@ export default class extends Controller {
      * @param {Element} frame  the live frame
      * @param {Element} fresh  the same frame as the server has just rendered it
      */
+    _copyListContext(frame, fresh) {
+        frame.dataset.listRendered = fresh.dataset.listRendered ?? "1";
+        frame.dataset.syncScope = fresh.dataset.syncScope ?? "*";
+        frame.dataset.listScopeValue = fresh.dataset.listScopeValue ?? "";
+    }
+
     _swapRegions(frame, fresh) {
         const regions = REFRESHABLE_REGIONS.map((name) => [
             name,
