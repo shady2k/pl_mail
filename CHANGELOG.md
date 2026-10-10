@@ -11,6 +11,7 @@ The published image tags: `latest` follows the most recent release below,
 **Archived mail is now one click away.** All Mail lists incoming, sent, archived and draft
 conversations across accounts or within one account, excluding Spam and Trash. Inbox stays
 a separate view. Counts and pagination deduplicate Gmail labels. No schema change.
+
 **AI can use an OpenAI-compatible service.** Generation and embeddings have separate
 connections, with encrypted keys and optional headers. Ollama remains the default. Changes
 to the embedding vector space require explicit confirmation before indexing.
@@ -18,6 +19,12 @@ Schema changes add provider settings and relabel existing Ollama vector identiti
 migration is irreversible. Back up the database, generated secrets and stored files before
 upgrading. A rollback needs the previous image and that complete backup. Active embedding
 backfills are paused on upgrade and never automatically restarted by this migration.
+
+**Concurrent Gmail imports share the same quota budget.** Settings now control the
+per-user and project rate with safety headroom; throttled work waits for a shared cooldown
+instead of losing message IDs. A new quota-state table is created automatically on boot.
+The down migration deliberately refuses to erase live cooldown state; roll back using a
+pre-upgrade database, secrets and storage backup with the previous image.
 
 **Keyboard shortcuts, the ones Gmail uses.** `j` and `k` move through a list, `o` opens, `u` goes
 back, `x` selects, `e` archives, `#` deletes, `s` stars, `r` `a` `f` reply, reply to all and
