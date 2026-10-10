@@ -104,3 +104,28 @@ docker compose --env-file /dev/null -p plmail-image-test \
 No repository push, PR, registry publication or remote deployment is part of this
 local test. To stop it while preserving test volumes, use the same command prefix
 with `down` instead of `up -d ...`.
+
+## Restore fixtures and attach after onboarding
+
+The temporary test users/account were removed to reopen first-admin onboarding.
+The reproducible mail fixture is `tools/image-test/seed_mail.py`; it is idempotent
+by Message-ID and appends only to the fixed internal GreenMail host. It does not
+send SMTP. The historical SMTP-delivery subject is restored as an IMAP fixture;
+that restoration alone is not evidence of an SMTP test.
+
+After Docker is available and the stack is running, restore the mailbox:
+
+```sh
+docker run --rm --network plmail-image-test_default \
+  -v "$PWD/tools/image-test/seed_mail.py:/seed_mail.py:ro" \
+  python:3.11-slim-bookworm python /seed_mail.py
+```
+
+Create your administrator through `/install`, sign in yourself, and use Settings
+→ Accounts → Add account with the local mailbox parameters above. This attaches
+the synthetic mailbox to your own user without anyone reading, setting, or
+receiving your administrator password. Trigger the account's sync after saving.
+No persisted plMail account is transferred from a temporary test identity.
+
+The recovery helper was syntax-checked locally. Its repeatability still needs a
+Docker run after the host disk/Docker-daemon blocker is resolved.
