@@ -37,6 +37,9 @@ services:
       APP_CONTAINER_NAME: image-test-web
     ports: !override
       - "127.0.0.1:18017:80"
+    networks:
+      - default
+      - ui
   worker:
     image: plmail-integration:test-all-mail-openai
     pull_policy: never
@@ -51,6 +54,14 @@ services:
       POSTGRES_PASSWORD_FILE: /run/plmail/postgres_password
     healthcheck:
       test: ["CMD", "pg_isready", "-d", "app_image_test", "-U", "app"]
+  test-mail:
+    image: greenmail/standalone:2.1.14
+    restart: unless-stopped
+    environment:
+      GREENMAIL_OPTS: "-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled"
+      JAVA_OPTS: "-Djava.net.preferIPv4Stack=true -Xmx256m"
+    # Deliberately no host mail ports, no outbound relay, and no real credentials.
+    expose: ["3025", "3143"]
   ntfy:
     ports: !reset []
 
@@ -59,3 +70,7 @@ services:
 networks:
   default:
     internal: true
+  ui:
+    # Docker Desktop needs a non-internal frontend to publish loopback HTTP.
+    # Only php joins it; workers, DB and mail remain on the internal network.
+    driver: bridge

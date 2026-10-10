@@ -28,3 +28,6 @@ test-results/
 Dockerfile
 **/Thumbs.db
 **/.DS_Store
+
+# Local verification scripts, credentials and diagnostics must never enter images.
+.local-test/

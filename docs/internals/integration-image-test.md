@@ -6,7 +6,7 @@ independent. Only adjacent translation additions conflicted; all keys were kept.
 
 ## Build after the architecture and local/publication choice are confirmed
 
-This preparation does not build or publish an image. For a **local** build, set
+The authorized local build uses `linux/arm64` on Docker Desktop. For a rebuild, set
 `PLMAIL_TEST_PLATFORM` to the confirmed Docker platform, then run from this checkout:
 
 ```sh
@@ -42,12 +42,14 @@ docker compose --env-file /dev/null -p plmail-image-test \
 The override pins the test tag on `php`, `worker`, and `secrets-init`; application
 images have `pull_policy: never`. It uses production application settings, a new
 `app_image_test` database, project-scoped Docker volumes, fresh generated test
-secrets, internal-only container networking, and `127.0.0.1:18017` HTTP. No source,
-real database, or attachment directory is mounted. The internal network prevents
-external IMAP/SMTP/LLM access, including account-specific SMTP (which
-`MAILER_DSN=null://null` alone does not block). Do not attach an external network,
-import real data, or enter real accounts or API keys. Upstream optional ntfy ports
-are removed as well.
+secrets, an internal backend network, and `127.0.0.1:18017` HTTP. Only the web
+container also joins a separate frontend bridge so Docker Desktop can publish
+the loopback port. No source,
+real database, or attachment directory is mounted. The worker, database and
+GreenMail stay on the internal backend. The web frontend can technically reach
+external hosts; use only synthetic accounts and mock AI settings in this stack.
+`MAILER_DSN=null://null` does not disable account-specific SMTP. Upstream optional
+ntfy ports are removed.
 
 The entrypoint migrates the database automatically, including console starts.
 The project name must stay `plmail-image-test`; do not substitute an existing
@@ -65,8 +67,40 @@ shared test secrets volume. Its Doctrine test suffix must point to
 test environment. Seed a synthetic user/admin and Gmail-style fixture messages;
 never clone an operational DB. Do not run a mail worker while entering fixtures.
 
-A separate fixture recipe against the production image's database remains to be
-verified after the architecture/startup choice. The tests already run in this
-checkout use their own synthetic verification DB instead. Focused browser checks
-previously exercised Symfony/Turbo HTTP navigation/actions and AI settings with a
-local mock; FrankenPHP worker/Mercure/whole-view-worker coverage is still pending.
+The combined production image was verified with two focused Chromium tests:
+All Mail navigation/archive/bulk/undo and compatible-provider settings against
+an internal HTTP mock. Seeded test users need production-default password hashes;
+the reduced-cost test hasher otherwise triggers an authentication-upgrade mismatch.
+Temporary test users are removed before handoff; create your first administrator
+at `http://127.0.0.1:18017/install` using your own credentials.
+
+## Local synthetic mail server
+
+The override also runs `greenmail/standalone:2.1.14` with IMAP and SMTP only,
+without host-published mail ports. GreenMail is a test server and does not forward
+mail externally. Its mailboxes are in memory: restarting it loses the seeded mail.
+Authentication is intentionally disabled on this isolated test server.
+
+After your own administrator onboarding, add the synthetic mailbox:
+
+- Address and username: `fixture@plmail.test`.
+- IMAP: `test-mail`, port `3143`, no encryption.
+- SMTP: `test-mail`, port `3025`, no encryption.
+- Password: any throwaway test value; never reuse a real password.
+
+The server was seeded with fictional Inbox, Sent, Archive, Projects, Spam, Trash
+and Drafts messages plus one local SMTP delivery. A temporary plMail account
+successfully synchronized nine threads. A physical IMAP copy in two folders is
+represented by separate upstream threads; Gmail's multi-label deduplication is
+covered by the feature tests, rather than this generic IMAP fixture.
+
+Start all test services with the same explicit project/files:
+
+```sh
+docker compose --env-file /dev/null -p plmail-image-test \
+  -f compose.yaml -f compose.image-test.yaml up -d php worker test-mail
+```
+
+No repository push, PR, registry publication or remote deployment is part of this
+local test. To stop it while preserving test volumes, use the same command prefix
+with `down` instead of `up -d ...`.
