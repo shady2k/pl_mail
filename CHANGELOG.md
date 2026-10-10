@@ -8,6 +8,15 @@ The published image tags: `latest` follows the most recent release below,
 
 ## Unreleased
 
+**Keyboard shortcuts, the ones Gmail uses.** `j` and `k` move through a list, `o` opens, `u` goes
+back, `x` selects, `e` archives, `#` deletes, `s` stars, `r` `a` `f` reply, reply to all and
+forward, `c` writes, `/` searches, `g` then a letter goes to a list, `z` undoes. **?** shows all of
+them, and so does the keyboard button above a mail list. A key acts on the selection, otherwise on the open conversation, otherwise on the highlighted
+row, and does exactly what the button it stands for does. Nothing happens while you are typing or
+while a dialog or menu is open. On for everyone; Settings → General → Keyboard shortcuts switches
+them off per person. No migration.
+[#36](https://github.com/karatektus/pl_mail/issues/36).
+
 **Archived mail is now one click away.** All Mail lists incoming, sent, archived and draft
 conversations across accounts or within one account, excluding Spam and Trash. Inbox stays
 a separate view. Counts and pagination deduplicate Gmail labels. No schema change.
@@ -25,15 +34,6 @@ per-user and project rate with safety headroom; throttled work waits for a share
 instead of losing message IDs. A new quota-state table is created automatically on boot.
 The down migration deliberately refuses to erase live cooldown state; roll back using a
 pre-upgrade database, secrets and storage backup with the previous image.
-
-**Keyboard shortcuts, the ones Gmail uses.** `j` and `k` move through a list, `o` opens, `u` goes
-back, `x` selects, `e` archives, `#` deletes, `s` stars, `r` `a` `f` reply, reply to all and
-forward, `c` writes, `/` searches, `g` then a letter goes to a list, `z` undoes. **?** shows all of
-them, and so does the keyboard button above a mail list. A key acts on the selection, otherwise on the open conversation, otherwise on the highlighted
-row, and does exactly what the button it stands for does. Nothing happens while you are typing or
-while a dialog or menu is open. On for everyone; Settings → General → Keyboard shortcuts switches
-them off per person. No migration.
-[#36](https://github.com/karatektus/pl_mail/issues/36).
 
 `a` replies on a message that has only one recipient, where there is no Reply to all to press. The
 toolbar above a selection has a **Star** button, and `s` presses it; before, `s` did nothing with
