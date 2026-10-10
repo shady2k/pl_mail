@@ -127,5 +127,7 @@ the synthetic mailbox to your own user without anyone reading, setting, or
 receiving your administrator password. Trigger the account's sync after saving.
 No persisted plMail account is transferred from a temporary test identity.
 
-The recovery helper was syntax-checked locally. Its repeatability still needs a
-Docker run after the host disk/Docker-daemon blocker is resolved.
+The recovery helper was syntax-checked and executed twice against the local
+GreenMail after restoring the stopped backend. The second run added no duplicates;
+the mailbox contains nine messages across seven folders. Health and first-admin
+onboarding both returned HTTP 200. No SMTP send was performed during recovery.
