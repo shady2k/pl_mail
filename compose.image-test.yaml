@@ -47,6 +47,10 @@ services:
     environment: !override
       <<: *image-test-env
       APP_CONTAINER_NAME: image-test-worker
+    # Explicitly approved outbound access for configured model providers.
+    networks:
+      - default
+      - ui
   database:
     image: postgres:18-alpine
     environment: !override
@@ -73,5 +77,5 @@ networks:
     internal: true
   ui:
     # Docker Desktop needs a non-internal frontend to publish loopback HTTP.
-    # Only php joins it; workers, DB and mail remain on the internal network.
+    # Web and worker join it; DB and synthetic mail stay on the internal network.
     driver: bridge
