@@ -42,7 +42,7 @@ docker compose --env-file /dev/null -p plmail-image-test \
 The override pins the test tag on `php`, `worker`, and `secrets-init`; application
 images have `pull_policy: never`. It uses production application settings, a new
 `app_image_test` database, project-scoped Docker volumes, fresh generated test
-secrets, an internal backend network, and `192.168.0.202:18017` HTTP. Only the web
+secrets, an internal backend network, and `127.0.0.1:18017` HTTP. Only the web
 container also joins a separate frontend bridge so Docker Desktop can publish
 the published web port. No source,
 real database, or attachment directory is mounted. The worker, database and
@@ -72,7 +72,7 @@ All Mail navigation/archive/bulk/undo and compatible-provider settings against
 an internal HTTP mock. Seeded test users need production-default password hashes;
 the reduced-cost test hasher otherwise triggers an authentication-upgrade mismatch.
 Temporary test users are removed before handoff; create your first administrator
-at `http://192.168.0.202:18017/install` using your own credentials.
+at `http://127.0.0.1:18017/install` using your own credentials.
 
 ## Local synthetic mail server
 
@@ -135,7 +135,7 @@ onboarding both returned HTTP 200. No SMTP send was performed during recovery.
 ## Authorized LAN web access
 
 The user explicitly approved exposing the empty synthetic installation before
-administrator onboarding. Only web port 18017 is bound to `192.168.0.202` on
+administrator onboarding. Only web port 18017 is bound to `127.0.0.1` on
 Mac mini's active private LAN interface `en8`; it is not bound to all interfaces.
 The web service's Mercure public URL uses the same origin. `SERVER_NAME=:80`
 already accepts this host and needs no security bypass. Built-in authentication

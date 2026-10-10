@@ -31,3 +31,8 @@ Dockerfile
 
 # Local verification scripts, credentials and diagnostics must never enter images.
 .local-test/
+
+# Verification overlays and fixtures are not production runtime assets.
+compose.image-test.yaml
+tests/
+tools/image-test/
