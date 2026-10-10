@@ -42,9 +42,9 @@ docker compose --env-file /dev/null -p plmail-image-test \
 The override pins the test tag on `php`, `worker`, and `secrets-init`; application
 images have `pull_policy: never`. It uses production application settings, a new
 `app_image_test` database, project-scoped Docker volumes, fresh generated test
-secrets, an internal backend network, and `127.0.0.1:18017` HTTP. Only the web
+secrets, an internal backend network, and `192.168.0.202:18017` HTTP. Only the web
 container also joins a separate frontend bridge so Docker Desktop can publish
-the loopback port. No source,
+the published web port. No source,
 real database, or attachment directory is mounted. The worker, database and
 GreenMail stay on the internal backend. The web frontend can technically reach
 external hosts; use only synthetic accounts and mock AI settings in this stack.
@@ -72,7 +72,7 @@ All Mail navigation/archive/bulk/undo and compatible-provider settings against
 an internal HTTP mock. Seeded test users need production-default password hashes;
 the reduced-cost test hasher otherwise triggers an authentication-upgrade mismatch.
 Temporary test users are removed before handoff; create your first administrator
-at `http://127.0.0.1:18017/install` using your own credentials.
+at `http://192.168.0.202:18017/install` using your own credentials.
 
 ## Local synthetic mail server
 
@@ -131,3 +131,14 @@ The recovery helper was syntax-checked and executed twice against the local
 GreenMail after restoring the stopped backend. The second run added no duplicates;
 the mailbox contains nine messages across seven folders. Health and first-admin
 onboarding both returned HTTP 200. No SMTP send was performed during recovery.
+
+## Authorized LAN web access
+
+The user explicitly approved exposing the empty synthetic installation before
+administrator onboarding. Only web port 18017 is bound to `192.168.0.202` on
+Mac mini's active private LAN interface `en8`; it is not bound to all interfaces.
+The web service's Mercure public URL uses the same origin. `SERVER_NAME=:80`
+already accepts this host and needs no security bypass. Built-in authentication
+and installation flow are unchanged. Mail and database ports stay unpublished.
+This specific DHCP address may change; update this test override if that happens.
+A remote LAN device has not been tested by the agent.

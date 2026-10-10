@@ -34,9 +34,10 @@ services:
     environment: !override
       <<: *image-test-env
       SERVER_NAME: ":80"
+      MERCURE_PUBLIC_URL: http://192.168.0.202:18017/.well-known/mercure
       APP_CONTAINER_NAME: image-test-web
     ports: !override
-      - "127.0.0.1:18017:80"
+      - "192.168.0.202:18017:80"
     networks:
       - default
       - ui
