@@ -34,7 +34,7 @@ final class GmailApiSyncer
     private const int PAGE_SIZE = 500;
 
     /** Gmail message IDs per fan-out batch. */
-    private const int BATCH_SIZE = 100;
+    private const int BATCH_SIZE = 50;
 
     /** How many of the Inbox's newest messages an import asks for by name, first. */
     private const int INBOX_SLICE = 200;
