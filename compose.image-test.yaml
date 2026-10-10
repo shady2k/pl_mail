@@ -1,0 +1,61 @@
+# Combine explicitly with compose.yaml and --env-file /dev/null.
+# No build or pull is triggered here; build the confirmed architecture first.
+name: plmail-image-test
+
+x-image-test-env: &image-test-env
+  APP_ENV: prod
+  APP_SECRET: ""
+  APP_ENCRYPTION_KEY: ""
+  DATABASE_URL: ""
+  POSTGRES_HOST: database
+  POSTGRES_USER: app
+  POSTGRES_DB: app_image_test
+  POSTGRES_VERSION: "18"
+  POSTGRES_PASSWORD: ""
+  MERCURE_JWT_SECRET: ""
+  MERCURE_URL: http://mercure/.well-known/mercure
+  MERCURE_PUBLIC_URL: http://127.0.0.1:18017/.well-known/mercure
+  MERCURE_COOKIE_NAME: mercure_access_token
+  MAILER_DSN: null://null
+  MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+
+services:
+  secrets-init:
+    image: plmail-integration:test-all-mail-openai
+    pull_policy: never
+    environment: !override
+      APP_SECRET: ""
+      APP_ENCRYPTION_KEY: ""
+      POSTGRES_PASSWORD: ""
+      MERCURE_JWT_SECRET: ""
+  php:
+    image: plmail-integration:test-all-mail-openai
+    pull_policy: never
+    environment: !override
+      <<: *image-test-env
+      SERVER_NAME: ":80"
+      APP_CONTAINER_NAME: image-test-web
+    ports: !override
+      - "127.0.0.1:18017:80"
+  worker:
+    image: plmail-integration:test-all-mail-openai
+    pull_policy: never
+    environment: !override
+      <<: *image-test-env
+      APP_CONTAINER_NAME: image-test-worker
+  database:
+    image: postgres:18-alpine
+    environment: !override
+      POSTGRES_DB: app_image_test
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD_FILE: /run/plmail/postgres_password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "app_image_test", "-U", "app"]
+  ntfy:
+    ports: !reset []
+
+# All inherited volumes are project-scoped, non-external, without host binds.
+# The explicit -p below keeps their names away from an existing installation.
+networks:
+  default:
+    internal: true
