@@ -1,7 +1,7 @@
 # Combined All Mail / compatible-provider image test
 
 Prepared on `test/all-mail-openai` from main `1bae047d`, combining
-`feat/all-mail` and `feat/openai-provider`. The original feature branches remain
+`feat/all-mail`, `feat/openai-provider`, and `fix/gmail-quota-settings`. The original feature branches remain
 independent. Only adjacent translation additions conflicted; all keys were kept.
 
 ## Build after the architecture and local/publication choice are confirmed
@@ -142,3 +142,12 @@ already accepts this host and needs no security bypass. Built-in authentication
 and installation flow are unchanged. Mail and database ports stay unpublished.
 This specific DHCP address may change; update this test override if that happens.
 A remote LAN device has not been tested by the agent.
+
+## Things that bite
+
+For an update of this already onboarded stack, rebuild the local image and recreate
+only `php` and `worker` with `up -d --no-deps --wait php worker`. Do not recreate
+GreenMail: its in-memory mailbox would be lost. Preserve the existing database,
+volumes, administrator and user-managed AI settings. The new Gmail quota table
+coordinates workers without changing old failed jobs or Google Cloud quotas.
+Reindexing embeddings still requires its separate explicit confirmation.
