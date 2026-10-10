@@ -52,6 +52,7 @@ name: E2E
 # collide over.
 on:
     push:
+        branches: ['test/all-mail-openai']
         tags: ['v*']
     # Kept, and cheap: a pull request is somebody proposing a change, which is
     # exactly when a second opinion from the suite is worth having, and there
