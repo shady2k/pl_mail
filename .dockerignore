@@ -34,5 +34,6 @@ Dockerfile
 
 # Verification overlays and fixtures are not production runtime assets.
 compose.image-test.yaml
+.env.test
 tests/
 tools/image-test/
