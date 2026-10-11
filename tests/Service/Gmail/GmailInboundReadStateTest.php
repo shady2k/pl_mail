@@ -93,6 +93,25 @@ final class GmailInboundReadStateTest extends KernelTestCase
         self::assertContains(MessageFlag::SEEN->value, $message->flags);
     }
 
+    public function testTaggedHistoryRefreshesExistingLabelsAndRedeliveryMakesNoRequest(): void
+    {
+        $message = $this->seedMessage(seen: false);
+        $state = new \App\Service\Gmail\GmailFetchState($this->connection);
+        $state->complete((int) $this->account->id, [self::GMAIL_ID], '100');
+        self::assertSame(1, $this->handle(['INBOX', 'STARRED'], '101'));
+        $this->em->refresh($message);
+        self::assertNotNull($message->seenAt);
+        self::assertNotNull($message->starredAt);
+        self::assertSame(['INBOX', 'STARRED'], $message->gmailLabelIds);
+        self::assertSame(0, $this->handle(['INBOX', 'UNREAD'], '101'));
+        $this->em->refresh($message);
+        self::assertNotNull($message->seenAt);
+        self::assertSame(1, $this->handle(['INBOX', 'UNREAD'], '102'));
+        $this->em->refresh($message);
+        self::assertNull($message->seenAt);
+        self::assertNull($message->starredAt);
+    }
+
     /** UNREAD back on, stored read → unread. */
     public function testAMessageMarkedUnreadInGmailBecomesUnreadHere(): void
     {
@@ -210,7 +229,7 @@ final class GmailInboundReadStateTest extends KernelTestCase
      *
      * @return int how many HTTP requests the client made
      */
-    private function handle(array $labelIds): int
+    private function handle(array $labelIds, ?string $revision = null): int
     {
         $requests = 0;
 
@@ -270,9 +289,10 @@ final class GmailInboundReadStateTest extends KernelTestCase
             $container->get('App\Service\Mail\MessageCategorizer'),
             $container->get('App\Service\Imap\MessageThreader'),
             new \App\Service\Mail\SyncOrigin(),
+            null === $revision ? null : new \App\Service\Gmail\GmailFetchState($this->connection),
         );
 
-        $handler(new SyncGmailMessageBatchMessage((int) $this->account->id, [self::GMAIL_ID]));
+        $handler(new SyncGmailMessageBatchMessage((int) $this->account->id, [self::GMAIL_ID], historyRevision: $revision));
 
         $this->em->flush();
 

@@ -160,6 +160,7 @@ final readonly class AiBackfillStateRepository
         $sql = <<<'SQL'
             UPDATE ai_backfill_state
                SET status           = 'running',
+                   run_id           = :run_id,
                    pause_reason     = NULL,
                    empty_batches    = 0,
                    last_error       = NULL,
@@ -176,6 +177,7 @@ final readonly class AiBackfillStateRepository
         SQL;
 
         return $this->write($sql, [
+            'run_id' => bin2hex(random_bytes(16)),
             'now'   => $now,
             'stale' => $now->modify('-' . self::STALE_AFTER_SECONDS . ' seconds'),
         ], ['now' => Types::DATETIME_IMMUTABLE, 'stale' => Types::DATETIME_IMMUTABLE]) > 0;
@@ -188,7 +190,7 @@ final readonly class AiBackfillStateRepository
      * themselves leave a delayed delivery in the queue, and the two that do not
      * have ended the chain. {@see BackfillPauseReason}.
      */
-    public function pause(BackfillPauseReason $reason, DateTimeImmutable $now): void
+    public function pause(BackfillPauseReason $reason, DateTimeImmutable $now, ?BackfillRun $expectedRun = null): void
     {
         $this->write(
             <<<'SQL'
@@ -200,6 +202,7 @@ final readonly class AiBackfillStateRepository
             SQL,
             ['reason' => $reason->value, 'now' => $now],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
     }
 
@@ -216,7 +219,7 @@ final readonly class AiBackfillStateRepository
      * chain go through pause() and deliberately stop touching the clock, so
      * that a run abandoned mid-pause is still recognisable as abandoned.
      */
-    public function yieldFor(BackfillPauseReason $reason, DateTimeImmutable $now): void
+    public function yieldFor(BackfillPauseReason $reason, DateTimeImmutable $now, ?BackfillRun $expectedRun = null): void
     {
         $this->write(
             <<<'SQL'
@@ -229,6 +232,7 @@ final readonly class AiBackfillStateRepository
             SQL,
             ['reason' => $reason->value, 'now' => $now],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
     }
 
@@ -244,7 +248,7 @@ final readonly class AiBackfillStateRepository
      * resumes itself — the walk demonstrating it is moving again rather than a
      * separate transition somebody has to remember to write.
      */
-    public function recordChunk(int $userId, ?int $cursor, bool $done, int $failures, DateTimeImmutable $now): void
+    public function recordChunk(int $userId, ?int $cursor, bool $done, int $failures, DateTimeImmutable $now, ?BackfillRun $expectedRun = null): void
     {
         $this->write(
             <<<'SQL'
@@ -271,6 +275,7 @@ final readonly class AiBackfillStateRepository
                 'now'      => $now,
             ],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
     }
 
@@ -283,9 +288,9 @@ final readonly class AiBackfillStateRepository
      *
      * @return int how many in a row now
      */
-    public function noteEmptyChunk(DateTimeImmutable $now): int
+    public function noteEmptyChunk(DateTimeImmutable $now, ?BackfillRun $expectedRun = null): int
     {
-        $this->write(
+        $written = $this->write(
             <<<'SQL'
                 UPDATE ai_backfill_state
                    SET empty_batches = empty_batches + 1,
@@ -294,12 +299,13 @@ final readonly class AiBackfillStateRepository
             SQL,
             ['now' => $now],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
 
-        return $this->current()->emptyBatches;
+        return 0 === $written ? -1 : $this->current()->emptyBatches;
     }
 
-    public function markFailed(string $errorKind, DateTimeImmutable $now): void
+    public function markFailed(string $errorKind, DateTimeImmutable $now, ?BackfillRun $expectedRun = null): void
     {
         $this->write(
             <<<'SQL'
@@ -312,10 +318,11 @@ final readonly class AiBackfillStateRepository
             SQL,
             ['error' => mb_substr($errorKind, 0, 32), 'now' => $now],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
     }
 
-    public function markComplete(DateTimeImmutable $now): void
+    public function markComplete(DateTimeImmutable $now, ?BackfillRun $expectedRun = null): void
     {
         $this->write(
             <<<'SQL'
@@ -328,6 +335,7 @@ final readonly class AiBackfillStateRepository
             SQL,
             ['now' => $now],
             ['now' => Types::DATETIME_IMMUTABLE],
+            $expectedRun,
         );
     }
 
@@ -385,8 +393,16 @@ final readonly class AiBackfillStateRepository
      *
      * @return int rows affected, or 0 when the write could not happen at all
      */
-    private function write(string $sql, array $params = [], array $types = []): int
+    private function write(string $sql, array $params = [], array $types = [], ?BackfillRun $expectedRun = null): int
     {
+        // Worker writes are fenced inside SQL, including an operator pause
+        // that lands while HTTP is in flight. Explicit admin writes stay unguarded.
+        if (null !== $expectedRun) {
+            $sql .= " AND run_id IS NOT DISTINCT FROM :expected_run_id"
+                . " AND (status = 'running' OR (status = 'paused' AND pause_reason IN ('interactive', 'host_unreachable')))";
+            $params['expected_run_id'] = $expectedRun->runId;
+        }
+
         try {
             return (int) $this->connection->executeStatement($sql, $params, $types);
         } catch (Throwable $exception) {

@@ -138,6 +138,7 @@ final class AiBackfillStateRepositoryTest extends KernelTestCase
 
         $this->repository->begin('nomic-embed-text', [1], $now);
         $this->repository->recordChunk(1, 500, false, 0, $now);
+        $inflight = $this->repository->current();
         $this->repository->pause(BackfillPauseReason::Operator, $now);
 
         self::assertTrue($this->repository->resume($now));
@@ -146,6 +147,9 @@ final class AiBackfillStateRepositoryTest extends KernelTestCase
 
         self::assertSame(BackfillStatus::Running, $run->status);
         self::assertSame(500, $run->cursorFor(1), 'a resume does not lose the cursor');
+        self::assertNotSame($inflight->runId, $run->runId);
+        $this->repository->recordChunk(1, 999, false, 0, $now, $inflight);
+        self::assertSame(500, $this->repository->current()->cursorFor(1));
 
         // Already going, and not stale: nothing to resume.
         self::assertFalse($this->repository->resume($now));
@@ -171,6 +175,42 @@ final class AiBackfillStateRepositoryTest extends KernelTestCase
 
         self::assertSame(BackfillStatus::Failed, $run->status);
         self::assertSame('no_answer', $run->lastError);
+    }
+
+    public function testAnInflightOldChunkCannotMutateAReplacementRun(): void
+    {
+        $now = new DateTimeImmutable();
+        $this->repository->begin('old-space', [1], $now);
+        $old = $this->repository->current();
+        // This is the operator action while the old worker awaits HTTP.
+        $this->repository->pause(BackfillPauseReason::Operator, $now);
+        self::assertTrue($this->repository->begin('replacement-space', [1], $now));
+        $replacement = $this->repository->current();
+        self::assertNotSame($old->runId, $replacement->runId);
+
+        $this->repository->recordChunk(1, 999, true, 3, $now, $old);
+        self::assertSame(-1, $this->repository->noteEmptyChunk($now, $old));
+        $this->repository->yieldFor(BackfillPauseReason::HostUnreachable, $now, $old);
+        $this->repository->pause(BackfillPauseReason::FeatureOff, $now, $old);
+        $this->repository->markFailed('no_answer', $now, $old);
+        $this->repository->markComplete($now, $old);
+        self::assertEquals($replacement, $this->repository->current());
+
+        $this->repository->recordChunk(1, 10, false, 0, $now, $replacement);
+        self::assertSame(10, $this->repository->current()->cursorFor(1));
+    }
+
+    public function testAnInflightChunkCannotUndoAnOperatorPause(): void
+    {
+        $now = new DateTimeImmutable();
+        $this->repository->begin('space', [1], $now);
+        $inflight = $this->repository->current();
+        $this->repository->pause(BackfillPauseReason::Operator, $now);
+        $paused = $this->repository->current();
+        $this->repository->recordChunk(1, 999, false, 0, $now, $inflight);
+        $this->repository->yieldFor(BackfillPauseReason::Interactive, $now, $inflight);
+        self::assertSame(-1, $this->repository->noteEmptyChunk($now, $inflight));
+        self::assertEquals($paused, $this->repository->current());
     }
 
     public function testInteractiveActivityIsStampedAndNeverMovesBackwards(): void

@@ -93,7 +93,11 @@ final class GmailFetchStateTest extends KernelTestCase
         try {
             (new GmailFetchState($this->db))->enqueue($this->accountId, ['a'], '0', function (): void {
                 // Same connection used by the production Doctrine transport.
-                $this->db->insert('messenger_messages', ['body' => '{}', 'headers' => '{}', 'queue_name' => 'dedup_test_only', 'created_at' => '2026-10-11 00:00:00', 'available_at' => '2026-10-11 00:00:00']);
+                $transport = new \Symfony\Component\Messenger\Bridge\Doctrine\Transport\DoctrineTransport(
+                    new \Symfony\Component\Messenger\Bridge\Doctrine\Transport\Connection(['queue_name' => 'dedup_test_only', 'auto_setup' => false], $this->db),
+                    new \Symfony\Component\Messenger\Transport\Serialization\PhpSerializer(),
+                );
+                $transport->send(new \Symfony\Component\Messenger\Envelope(new \App\Infrastructure\Messaging\Message\SyncGmailMessageBatchMessage($this->accountId, ['a'])));
                 throw new \RuntimeException('Synthetic failure after transport insert');
             });
             self::fail('Dispatch must fail');
@@ -101,6 +105,22 @@ final class GmailFetchStateTest extends KernelTestCase
             self::assertSame($before, (int) $this->db->fetchOne("SELECT count(*) FROM messenger_messages WHERE queue_name = 'dedup_test_only'"));
             self::assertSame(0, (int) $this->db->fetchOne('SELECT count(*) FROM gmail_fetch_state WHERE account_id = ?', [$this->accountId]));
         }
+    }
+
+    public function testLegacySerializedEnvelopeHasNoNewFields(): void
+    {
+        $class = \App\Infrastructure\Messaging\Message\SyncGmailMessageBatchMessage::class;
+        $old = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
+        foreach (['accountId' => $this->accountId, 'gmailIds' => ['a'], 'trigger' => null, 'partialRetryAttempt' => 0] as $name => $value) {
+            (new \ReflectionProperty($class, $name))->setValue($old, $value);
+        }
+        $serializer = new \Symfony\Component\Messenger\Transport\Serialization\PhpSerializer();
+        $wire = $serializer->encode(new \Symfony\Component\Messenger\Envelope($old));
+        $restored = $serializer->decode($wire)->getMessage();
+        self::assertInstanceOf($class, $restored);
+        self::assertSame(['a'], $restored->gmailIds);
+        self::assertNull($restored->historyRevision ?? null);
+        self::assertFalse($restored->importQueue ?? false);
     }
 
     public function testCompletedRetrySkipsFetchButLaterLabelHistoryRefreshes(): void

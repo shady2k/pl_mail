@@ -19,7 +19,7 @@ It is a local candidate, not an authorised production deployment.
 | Task headers | Legacy session mode translates to `{task_session_id}`. The whole-value marker resolves to one opaque task ID; Messenger stamp persists across retries. Backfill chunks share the run ID. |
 | Existing embeddings | Retain fork `v1:` identity derived from provider, endpoint, model and revision. Token rotation does not change the space. Endpoint/model changes require approval; unexpected width creates a new revision and blocks indexing. |
 | Summary cache | Retain the fork's provider/address/model cache identity, so cached summaries survive this upgrade and are invalidated on a connection change. |
-| AI backfill | Migration pauses running walks. Generation and space tags fence obsolete queued chunks. Approval does not start an index; starting/resuming remains an explicit operator action. |
+| AI backfill | Migration pauses running walks. SQL updates fence the original run and live status, including changes during HTTP; continuations retain the original run/space. Resume rotates the generation while retaining cursors. Generation and space tags fence obsolete queued chunks. Approval does not start an index; starting/resuming remains an explicit operator action. |
 | Configuration backups | Both upstream format and the deployed fork's connection/header fields are accepted. |
 
 ## Gmail fetch coverage
@@ -108,7 +108,19 @@ New regressions cover overlapping planners/Inbox pages, reservation and queue
 rollback, failed subsets, expired reservations, independent connection locks,
 actual handler redelivery with zero HTTP calls, later history refresh,
 local-cooldown diagnostics, sanitised inner batch errors, encrypted-setting
-compatibility, task/retry IDs and embedding-space isolation.
+compatibility, task/retry IDs and embedding-space isolation. PostgreSQL regressions
+also replace/pause a run while its old chunk is in flight, exercise the real
+Doctrine transport rollback, decode a pre-fields PHP envelope, and refresh
+read/star/labels with a synthetic 200 response at a newer history revision.
+
+An additional rehearsal created `app_test_upgrade_fixture` from the complete
+migration directory at deployed SHA `31346f347d65ee031f87429d2a018c580ba7fa13`,
+seeded only synthetic user/account/message/settings/vector rows, and applied
+this candidate's remaining migrations. Nine migrations completed, including
+all six new October 11 versions. SQL checks confirmed exact ciphertext/header
+retention, separate embedding connection, approved-space/width/vector row
+retention, paused old AI run, and the new dedup table. This is a historical-schema
+rehearsal; an actual production backup restore remains a prerequisite to rollout.
 
 ## Things that bite
 
