@@ -7,7 +7,7 @@ namespace DoctrineMigrations;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version20261011130000 extends AbstractMigration
+final class Version20261011140042 extends AbstractMigration
 {
     public function getDescription(): string { return 'Durable Gmail queued and completed fetch revisions'; }
 

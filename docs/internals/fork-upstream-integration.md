@@ -1,7 +1,10 @@
 # Fork upgrade and Gmail fetch deduplication
 
-This branch starts at upstream `92116fcdcbfe3af3226519f66349683096324245`
+This branch starts at upstream `99d2da3da2abe243a6259099f2fa2678c31c1acb`
 and integrates the deployed fork `31346f347d65ee031f87429d2a018c580ba7fa13`.
+The earlier validation base was `92116fcdcbfe3af3226519f66349683096324245`.
+The upstream unread-tab migration owns `Version20261011130000`; the fork dedup
+migration uses `Version20261011140042` to avoid that identity collision.
 It is a local candidate, not an authorised production deployment.
 
 ## Compatibility
