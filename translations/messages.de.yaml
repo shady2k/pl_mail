@@ -2913,6 +2913,8 @@ settings:
             heading: Nachrichtenliste
             listAvatars: Absenderkreise
             listAvatarsHint: Der farbige Kreis mit der Initiale des Absenders. Ausgeschaltet wird daraus ein schlichter Kreis, statt zu verschwinden — er ist zugleich das Auswahlkästchen der Zeile.
+            tabUnreadCount: 'Ungelesen-Zahl auf den Posteingangs-Tabs'
+            tabUnreadCountHint: 'Die Zahl neben dem Namen jedes Tabs: in wie vielen Unterhaltungen dieser Kategorie Ungelesenes liegt. Zusammen ergeben die Tabs den Posteingangs-Badge der Seitenleiste. Das Fähnchen „3 neu“ ist davon getrennt und bleibt.'
             previewLines: Vorschauzeilen
             previewLines0: Keine
             previewLines1: Eine Zeile

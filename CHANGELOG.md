@@ -8,6 +8,16 @@ The published image tags: `latest` follows the most recent release below,
 
 ## Unreleased
 
+**Each inbox tab shows how many conversations in it are unread.** The number is the sidebar's
+Inbox badge split by category, so the tabs add up to it, and it appears on every tab, the one you
+are on included, and updates in place on sync. Before, an unread conversation in Promotions made
+the Inbox badge read 1 while Primary, the tab that opens, showed nothing unread, and the only hint
+on the strip was a colour on the Promotions icon. The "3 new" pill is unchanged: it says what
+arrived that you have not been shown, the unread count says what is unread. On for everyone;
+Settings → Appearance → Message list switches it off per person. One column is added to the user
+table; the migration is reversible.
+[#54](https://github.com/karatektus/pl_mail/pull/54), by @Flouss.
+
 **An account's colour can be changed.** The coloured dot beside each account, and the mark on its
 messages in a mixed list, was picked for you when the account was added and could never be changed.
 Settings → Mail accounts now has a colour swatch on every row — Gmail and Outlook accounts included,

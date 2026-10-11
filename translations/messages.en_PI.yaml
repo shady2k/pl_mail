@@ -2767,6 +2767,8 @@ settings:
             heading: Manifest
             listAvatars: Sender medallions
             listAvatarsHint: The coloured coin bearin' the sender's initial. Struck off it turns a plain ring rather than vanishin' — 'tis also the row's tick-box.
+            tabUnreadCount: 'Unread tally on the inbox tabs'
+            tabUnreadCountHint: 'The number beside each tab''s name: how many yarns in that hold carry unread mail. Together the tabs make the Inbox tally in the sidebar. The "3 new" pennant be a separate thing an'' stays.'
             previewLines: Peek lines
             previewLines0: None
             previewLines1: One line

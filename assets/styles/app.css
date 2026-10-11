@@ -5084,6 +5084,21 @@ label:has(> input.sr-only) {
 }
 
 /*
+   The unread count on an inbox tab, switched off.
+
+   `:not(.hidden)`, and it is load-bearing. The badge is hidden at zero by the
+   `hidden` class, which the sidebar controller toggles when counts change. This
+   rule is unlayered and Tailwind's `.hidden` is not, so without the exemption
+   it would win and print a "0" on every tab that has nothing unread — the same
+   trap `[data-row-snippet]` documents below.
+
+   The fallback is for a page drawn without the appearance variables.
+*/
+[data-tab-unread]:not(.hidden) {
+    display: var(--tab-unread-display, inline);
+}
+
+/*
    The sender disc, switched off.
 
    Not `display: none`: the disc IS the row's checkbox — the real input is

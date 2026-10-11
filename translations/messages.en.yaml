@@ -2922,6 +2922,8 @@ settings:
             heading: Message list
             listAvatars: Sender discs
             listAvatarsHint: The coloured circle carrying the sender's initial. Switched off it becomes a plain circle rather than disappearing — it is also the row's checkbox.
+            tabUnreadCount: 'Unread count on inbox tabs'
+            tabUnreadCountHint: 'The number beside each tab''s name: how many conversations in that category hold unread mail. The tabs add up to the Inbox badge in the sidebar. The "3 new" pill is separate and stays.'
             previewLines: Preview lines
             previewLines0: None
             previewLines1: One line
