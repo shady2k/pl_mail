@@ -77,6 +77,7 @@ or extending plMail rather than running it.
 | [Architecture](internals/architecture.md) | The layers, what lives where, and the rules that keep it that way |
 | [Mail ingest](internals/mail-ingest.md) | The pipeline from provider to database, threading, categorisation |
 | [Gmail quota and sync warnings](internals/gmail-quota.md) | Shared budget, bounded retries, and incomplete-mail warnings |
+| [Fork upgrade and Gmail deduplication](internals/fork-upstream-integration.md) | Compatibility, migration rehearsal, queue coverage and rollout proposal |
 | [The calendar model](internals/calendar-model.md) | JSCalendar in jsonb, projected columns, occurrences, recurrence and overrides |
 | [The sync engine](internals/calendar-sync-engine.md) | The driver contract every provider implements, push channels, deduplication |
 | [AI assistance](internals/ai-assist.md) | The optional model features: what is off by default, and why the vector design avoids pgvector |

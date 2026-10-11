@@ -82,6 +82,7 @@ final readonly class AiBackfillStateRepository
             status:            BackfillStatus::tryFrom((string) ($row['status'] ?? '')) ?? BackfillStatus::Idle,
             pauseReason:       null === $row['pause_reason'] ? null : BackfillPauseReason::tryFrom((string) $row['pause_reason']),
             model:             null === $row['model'] ? null : (string) $row['model'],
+            runId:             $row['run_id'] ?? null,
             mailboxes:         $mailboxes,
             failures:          (int) ($row['failures'] ?? 0),
             emptyBatches:      (int) ($row['empty_batches'] ?? 0),
@@ -120,6 +121,7 @@ final readonly class AiBackfillStateRepository
                SET status           = 'running',
                    pause_reason     = NULL,
                    model            = :model,
+                   run_id           = :run_id,
                    mailboxes        = :mailboxes::jsonb,
                    failures         = 0,
                    empty_batches    = 0,
@@ -139,6 +141,7 @@ final readonly class AiBackfillStateRepository
 
         return $this->write($sql, [
             'model'     => $model,
+            'run_id' => bin2hex(random_bytes(16)),
             'mailboxes' => json_encode($mailboxes, JSON_THROW_ON_ERROR),
             'now'       => $now,
             'stale'     => $now->modify('-' . self::STALE_AFTER_SECONDS . ' seconds'),

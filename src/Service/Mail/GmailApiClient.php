@@ -63,6 +63,7 @@ final class GmailApiClient
         private readonly HttpClientInterface $httpClient,
         private readonly OAuthTokenManager  $tokenManager,
         private readonly GmailQuotaPacer    $pacer,
+        private readonly ?\Psr\Log\LoggerInterface $logger = null,
     ) {}
 
     // ── messages ─────────────────────────────────────────────────────────────
@@ -151,17 +152,18 @@ final class GmailApiClient
      * in the batch.
      *
      * @param list<string> $messageIds  Larger legacy jobs are split into at most 50 requests per HTTP batch
-     * @return array{payloads: array<string,array<string,mixed>>, retryable: list<string>, gone: list<string>}
+     * @return array{payloads: array<string,array<string,mixed>>, retryable: list<string>, gone: list<string>, confirmedGone: list<string>}
      */
     public function getMessages(Account $account, array $messageIds): array
     {
         if (count($messageIds) > 50) {
-            $combined = ['payloads' => [], 'retryable' => [], 'gone' => []];
+            $combined = ['payloads' => [], 'retryable' => [], 'gone' => [], 'confirmedGone' => []];
             foreach (array_chunk($messageIds, 50) as $chunk) {
                 $result = $this->getMessages($account, $chunk);
                 $combined['payloads'] += $result['payloads'];
                 $combined['retryable'] = array_merge($combined['retryable'], $result['retryable']);
                 $combined['gone'] = array_merge($combined['gone'], $result['gone']);
+                $combined['confirmedGone'] = array_merge($combined['confirmedGone'], $result['confirmedGone']);
             }
             return $combined;
         }
@@ -171,6 +173,7 @@ final class GmailApiClient
                 'payloads'  => [],
                 'retryable' => [],
                 'gone'      => [],
+                'confirmedGone' => [],
             ];
         }
 
@@ -178,7 +181,7 @@ final class GmailApiClient
 
         // The one call here that can spend a minute's quota on its own, so it
         // is the one that is paced. See GmailQuotaPacer.
-        $this->pacer->spend($account, GmailQuotaPacer::UNITS_PER_MESSAGE * count($messageIds));
+        $this->spend($account, GmailQuotaPacer::UNITS_PER_MESSAGE * count($messageIds), 'messages.get');
 
         $token    = $this->tokenManager->getValidAccessToken($account);
         $boundary = 'plmail_batch_' . bin2hex(random_bytes(8));
@@ -214,6 +217,20 @@ final class GmailApiClient
         }
 
         $parsed    = $this->parseBatchResponse($rawBody);
+        $errors = [];
+        foreach ($parsed['statuses'] as $id => $status) {
+            if ($status < 400) { continue; }
+            $reason = $parsed['reasons'][$id] ?? '';
+            $safeReason = in_array($reason, [...self::TRANSIENT_REASONS, ...self::PERMANENT_REASONS, 'notFound', 'UNAUTHENTICATED', 'PERMISSION_DENIED'], true) ? $reason : 'other';
+            $key = $status . ':' . $safeReason;
+            $errors[$key] = ($errors[$key] ?? 0) + 1;
+        }
+        if ([] !== $errors) {
+            $this->logger?->warning('Gmail remote batch failures', [
+                'source' => 'remote', 'method' => 'messages.get', 'accountId' => $account->id,
+                'requested' => count($messageIds), 'failures' => $errors,
+            ]);
+        }
         $payloads  = array_intersect_key($parsed['payloads'], array_flip($messageIds));
         $retryable = [];
         $gone      = [];
@@ -254,6 +271,9 @@ final class GmailApiClient
             'payloads'  => $payloads,
             'retryable' => $retryable,
             'gone'      => $gone,
+            // Permission/request failures are terminal for this delivery, but
+            // must not become durable evidence that the message no longer exists.
+            'confirmedGone' => array_values(array_filter($gone, static fn (string $id): bool => in_array($parsed['statuses'][$id] ?? null, [404, 410], true))),
         ];
     }
 
@@ -822,7 +842,10 @@ final class GmailApiClient
             str_starts_with($path, '/messages/') => 20,
             default => throw new \LogicException('Unknown Gmail quota cost.'),
         };
-        $this->pacer->spend($account, $units);
+        $this->spend($account, $units, match ($path) {
+            '/watch' => 'users.watch', '/history' => 'history.list', '/messages' => 'messages.list',
+            '/labels' => 'labels.list', '/profile' => 'users.getProfile', default => 'other',
+        });
         $response = $this->httpClient->request($method, $url, $options);
         try {
             $operation = match (true) {
@@ -832,7 +855,7 @@ final class GmailApiClient
                 '/messages/batchModify' === $path => 'messages.batchModify',
                 '/messages/batchDelete' === $path => 'messages.batchDelete',
                 '/history' === $path => 'history.list',
-                '/profile' === $path => 'getProfile',
+                '/profile' === $path => 'users.getProfile',
                 str_contains($path, '/attachments/') => 'attachments.get',
                 str_starts_with($path, '/messages/') => 'messages.get',
                 default => ltrim($path, '/'),
@@ -847,6 +870,20 @@ final class GmailApiClient
             if ('/settings/sendAs' !== $path) { throw $exception; }
         }
         return $response;
+    }
+
+    private function spend(Account $account, int $units, string $operation): void
+    {
+        try {
+            $this->pacer->spend($account, $units);
+        } catch (GmailThrottledException $failure) {
+            $this->logger?->notice('Gmail request held locally', [
+                'source' => 'local', 'method' => $operation, 'accountId' => $account->id,
+                'status' => $failure->getStatus(), 'reason' => 'localCooldown',
+                'retryAfterSeconds' => $failure->getRetryAfterSeconds(),
+            ]);
+            throw $failure;
+        }
     }
 
     private function decode(ResponseInterface $response, string $operation): array

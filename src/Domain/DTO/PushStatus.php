@@ -53,7 +53,7 @@ final readonly class PushStatus
         return $this->configured;
     }
 
-    public function withFailure(): self
+    public function withFailure(?string $provider = null): self
     {
         return new self(
             supported:  $this->supported,
@@ -61,7 +61,7 @@ final readonly class PushStatus
             configured: $this->configured,
             health:     $this->health,
             failed:     true,
-            provider:   $this->provider,
+            provider:   $provider ?? $this->provider,
         );
     }
 }

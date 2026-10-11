@@ -155,7 +155,7 @@ admin:
             embedding_provider: "Searcher's tongue"
             headers: 'Extra colours'
             headers_clear: 'Strike the stowed colours'
-            headers_help: "One to a line, writ Name: value. Flown on ev'ry call to the oracle, for a gate or go-between that wants more than a token. Stowed under lock an' never shown again."
+            headers_help: "One to a line, writ Name: value. Flown on ev'ry call to the oracle, for a gate or go-between that wants more than a token. Stowed under lock an' never shown again. Use {task_session_id} as the whole value to keep one task and its retries under one flag."
             headers_help_set: "Stowed: %names%. Leave it empty to keep 'em. Aught ye write here replaces the lot; what be stowed is never shown."
             provider: 'Tongue'
             provider_help: "Which tongue the oracle speaks. Ollama be the one plMail knows best: it can keep a model aboard an' fetch one ahead o' time. OpenAI-compatible covers near ev'rythin' else, in yer own waters or hired."
@@ -4078,3 +4078,8 @@ gmail_sync:
     incomplete_mail: Stored mail remains available. New mail and an empty Inbox may be incomplete.
     last_success: 'Last successful sync planning: %when%'
     retry_not_before: 'Known cooldown until at least %when%. This is not a promise of when new mail will appear.'
+
+admin.ai.embedding.confirm_change: 'The search connection or vector width changed. Review it before approving a new index. Approval does not start indexing.'
+admin.ai.embedding.approve_change: 'Approve the new search index'
+
+settings.accounts.push.failed.local_cooldown: 'Gmail push registration is waiting for the local quota cooldown. No request was sent to Google. Try again after the cooldown.'

@@ -18,6 +18,8 @@ includes:
 
 parameters:
     level: 5
+    scanFiles:
+        - migrations/Version20261011125000.php
 
     # The whole project rather than just src/ and tests/: bin/, config/ and
     # public/ hold real PHP that can break the same way anything else does —

@@ -112,8 +112,9 @@ final class EmbeddingCatchUpTest extends KernelTestCase
     {
         $this->enableSemanticSearch();
 
+        $space = $this->em->getRepository(AiSettings::class)->findOneBy([])->embeddingSpace();
         foreach ($this->messageIds as $id) {
-            $this->store->store($id, [1.0, 0.0], 'qwen3-embedding:0.6b');
+            $this->store->store($id, [1.0, 0.0], $space);
         }
 
         self::assertSame(0, $this->catchUp()->sweep($this->user, 50));

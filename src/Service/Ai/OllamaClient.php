@@ -125,6 +125,7 @@ final readonly class OllamaClient
     public function __construct(
         private HttpClientInterface $http,
         private LoggerInterface     $logger,
+        private ?AiTaskContext      $tasks = null,
     ) {
     }
 
@@ -151,7 +152,7 @@ final readonly class OllamaClient
      */
     public function authorised(AiConnection $connection): self
     {
-        $headers = $connection->requestHeaders();
+        $headers = $connection->requestHeaders($this->tasks?->id());
 
         if ([] === $headers) {
             return $this;

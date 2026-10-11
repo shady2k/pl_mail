@@ -305,7 +305,7 @@ final readonly class ThreadSummariser
      */
     public function model(): string
     {
-        return (string) $this->ai->settings()->chatModel;
+        return $this->ai->settings()->generationIdentity();
     }
 
     /**

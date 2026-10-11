@@ -160,7 +160,7 @@ final readonly class SemanticQuery
         // vectors from the same model at the same width — see SemanticSearch.
         return SemanticSearch::ran(
             $literal,
-            (string) $settings->embeddingModel,
+            $settings->embeddingSpace(),
             count($result->vector),
             $settings->semanticMinSimilarity,
         );

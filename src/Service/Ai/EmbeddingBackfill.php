@@ -126,7 +126,7 @@ final readonly class EmbeddingBackfill
             return self::SEARCH_OFF;
         }
 
-        $model = (string) $this->settings->currentOrDefault()->embeddingModel;
+        $model = $this->settings->currentOrDefault()->embeddingSpace();
 
         if ([] === $userIds) {
             foreach ($this->users->findAll() as $user) {
@@ -156,7 +156,7 @@ final readonly class EmbeddingBackfill
         }
 
         foreach ($userIds as $userId) {
-            $this->bus->dispatch(new BackfillEmbeddingsMessage($userId));
+            $this->bus->dispatch(new BackfillEmbeddingsMessage($userId, null, $this->state->current()->runId, $this->settings->currentOrDefault()->embeddingSpace()));
         }
 
         $this->logger->info('EmbeddingBackfill: started', ['mailboxes' => count($userIds), 'model' => $model]);
@@ -205,6 +205,9 @@ final readonly class EmbeddingBackfill
         // switched their own search off since the run began, and resuming a
         // chain over their mailbox would post a delivery whose only outcome is
         // the handler recording it finished.
+        if (null !== $run->model && $run->model !== $this->settings->currentOrDefault()->embeddingSpace()) {
+            return $this->start($run->unfinishedUserIds());
+        }
         $pending = $this->allowing($run->unfinishedUserIds());
 
         if ([] === $pending) {
@@ -216,7 +219,7 @@ final readonly class EmbeddingBackfill
         }
 
         foreach ($pending as $userId) {
-            $this->bus->dispatch(new BackfillEmbeddingsMessage($userId, $run->cursorFor($userId)));
+            $this->bus->dispatch(new BackfillEmbeddingsMessage($userId, $run->cursorFor($userId), $run->runId, $this->settings->currentOrDefault()->embeddingSpace()));
         }
 
         return self::RESUMED;
@@ -237,7 +240,7 @@ final readonly class EmbeddingBackfill
         // "none of this mailbox is searchable any more", which is the truth.
         $model = null === $settings->embeddingModel || '' === trim((string) $settings->embeddingModel)
             ? $run->model
-            : (string) $settings->embeddingModel;
+            : $settings->embeddingSpace();
 
         $coverage = null === $model
             ? ['embedded' => 0, 'eligible' => 0]

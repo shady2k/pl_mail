@@ -174,7 +174,7 @@ admin:
             enabled: 'Use a language model'
             headers: 'Extra headers'
             headers_clear: 'Remove the stored headers'
-            headers_help: 'One per line, written Name: value. Sent with every request to the model host, for a proxy or gateway that asks for more than a token. Stored encrypted and never shown again.'
+            headers_help: 'One per line, written Name: value. Sent with every request to the model host, for a proxy or gateway that asks for more than a token. Stored encrypted and never shown again. Use {task_session_id} as the whole value for a stable identifier across one task and its retries.'
             headers_help_set: 'On file: %names%. Leave empty to keep them. Anything typed here replaces all of them; the stored values are never shown.'
             provider: 'Provider'
             provider_help: 'Which API the model host speaks. Ollama is the one plMail knows most about: it can keep a model loaded and load one ahead of time. OpenAI-compatible covers nearly everything else, on your own network or hosted.'
@@ -4298,3 +4298,8 @@ gmail_sync:
     incomplete_mail: Stored mail remains available. New mail and an empty Inbox may be incomplete.
     last_success: 'Last successful sync planning: %when%'
     retry_not_before: 'Known cooldown until at least %when%. This is not a promise of when new mail will appear.'
+
+admin.ai.embedding.confirm_change: 'The search connection or vector width changed. Review the saved connection before approving a new index. Approval does not start indexing.'
+admin.ai.embedding.approve_change: 'Approve the new search index'
+
+settings.accounts.push.failed.local_cooldown: 'Gmail push registration is waiting for the local quota cooldown. No request was sent to Google. Try again after the cooldown.'

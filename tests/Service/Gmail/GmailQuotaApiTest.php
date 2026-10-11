@@ -45,6 +45,7 @@ final class GmailQuotaApiTest extends TestCase
         $client = $this->client($http, $pacer); $account = new Account(); $account->email = 'partial@example.test';
         $result = $client->getMessages($account, ['good','quota','permanent']);
         self::assertSame(['quota'], $result['retryable']); self::assertSame(['permanent'], $result['gone']); self::assertArrayHasKey('good', $result['payloads']);
+        self::assertSame([], $result['confirmedGone'], 'Permission failures must not permanently suppress a future authorised fetch');
         self::assertGreaterThanOrEqual(120000, $client->retryDelay($account, 0));
         $this->expectException(GmailThrottledException::class);
         $client->getProfile($account);

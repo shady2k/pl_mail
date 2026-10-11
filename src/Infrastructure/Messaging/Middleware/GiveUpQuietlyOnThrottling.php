@@ -83,6 +83,8 @@ final readonly class GiveUpQuietlyOnThrottling implements MiddlewareInterface
         #[Autowire(service: 'messenger.transport.ingest')]
         private SenderInterface $ingest,
         private LoggerInterface $logger,
+        #[Autowire(service: 'messenger.transport.ingest_backlog')]
+        private ?SenderInterface $backlog = null,
     ) {
     }
 
@@ -127,7 +129,9 @@ final readonly class GiveUpQuietlyOnThrottling implements MiddlewareInterface
                 // A NEW envelope around the same message, so the retry count
                 // starts again: the point of waiting is to try properly
                 // afterwards, not to arrive with one attempt left.
-                $this->ingest->send(new Envelope($message, [
+                $sender = $message instanceof SyncGmailMessageBatchMessage && true === ($message->importQueue ?? false)
+                    ? ($this->backlog ?? $this->ingest) : $this->ingest;
+                $sender->send(new Envelope($message, [
                     new DelayStamp(self::DEFER_SECONDS * 1000),
                     new ThrottleDeferralStamp($deferrals + 1),
                 ]));

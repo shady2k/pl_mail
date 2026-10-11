@@ -450,4 +450,11 @@ poll would empty a field mid-word.
         </div>
     </div>
 
+    {% if settings.embeddingReindexRequired %}
+        <form method="post" action="{{ path('app_admin_ai_embedding_approve') }}" class="mt-4">
+            <input type="hidden" name="_token" value="{{ csrf_token('ai-embedding-approve') }}">
+            <p>{{ 'admin.ai.embedding.confirm_change'|trans }}</p>
+            <button type="submit" class="btn btn-warning">{{ 'admin.ai.embedding.approve_change'|trans }}</button>
+        </form>
+    {% endif %}
 </turbo-frame>

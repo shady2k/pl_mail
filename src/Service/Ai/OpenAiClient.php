@@ -70,6 +70,7 @@ final readonly class OpenAiClient
     public function __construct(
         private HttpClientInterface $http,
         private LoggerInterface     $logger,
+        private ?AiTaskContext      $tasks = null,
     ) {
     }
 
@@ -89,7 +90,7 @@ final readonly class OpenAiClient
     public function probe(AiConnection $connection, ?float $timeout = null): AiProbe
     {
         try {
-            $response = $this->http->request('GET', self::url($connection, '/models'), self::options($connection, [
+            $response = $this->http->request('GET', self::url($connection, '/models'), $this->options($connection, [
                 'timeout'      => $timeout ?? self::PROBE_TIMEOUT,
                 // The idle timeout does not bound a server that answers one
                 // byte at a time, and this is polled by the panel.
@@ -139,7 +140,7 @@ final readonly class OpenAiClient
         $started = microtime(true);
 
         try {
-            $response = $this->http->request('POST', self::url($connection, '/embeddings'), self::options($connection, [
+            $response = $this->http->request('POST', self::url($connection, '/embeddings'), $this->options($connection, [
                 'json'    => ['model' => $model, 'input' => $this->utf8($text, $model)],
                 'timeout' => self::EMBED_TIMEOUT,
             ]));
@@ -209,7 +210,7 @@ final readonly class OpenAiClient
         $started = microtime(true);
 
         try {
-            $response = $this->http->request('POST', self::url($connection, '/chat/completions'), self::options($connection, [
+            $response = $this->http->request('POST', self::url($connection, '/chat/completions'), $this->options($connection, [
                 'json'    => $this->payload($model, $messages, $temperature, false),
                 'timeout' => OllamaClient::GENERATE_TIMEOUT,
             ]));
@@ -316,7 +317,7 @@ final readonly class OpenAiClient
         $firstToken = null;
 
         try {
-            $response = $this->http->request('POST', self::url($connection, '/chat/completions'), self::options($connection, [
+            $response = $this->http->request('POST', self::url($connection, '/chat/completions'), $this->options($connection, [
                 'json'    => $this->payload($model, $messages, $temperature, true),
                 // How often this wakes up, not how long the silence may last.
                 // The budget is counted below.
@@ -508,11 +509,11 @@ final readonly class OpenAiClient
      *
      * @return array<string, mixed>
      */
-    private static function options(AiConnection $connection, array $options): array
+    private function options(AiConnection $connection, array $options): array
     {
         return [
             ...$options,
-            'headers'       => $connection->requestHeaders(),
+            'headers'       => $connection->requestHeaders($this->tasks?->id()),
             'max_redirects' => 0,
         ];
     }

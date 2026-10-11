@@ -76,6 +76,7 @@ final readonly class GmailPushSubscriptionManager implements PushSubscriptionMan
         private EntityManagerInterface $em,
         private LoggerInterface        $logger,
         private GmailPushSettings      $pushSettings,
+        private ?GmailPushAttempt $attempt = null,
     ) {}
 
     public function supports(Account $account): bool
@@ -95,6 +96,7 @@ final readonly class GmailPushSubscriptionManager implements PushSubscriptionMan
 
     public function subscribe(Account $account): bool
     {
+        if (null !== $this->attempt) { $this->attempt->reason = null; }
         if (true !== $account->pushEnabled) {
             return false;
         }
@@ -110,17 +112,14 @@ final readonly class GmailPushSubscriptionManager implements PushSubscriptionMan
         try {
             $this->watchService->watch($account);
         } catch (\Throwable $e) {
-            // The exception message carries only the status line; Google puts the
-            // reason a watch was rejected — bad topicName, missing publisher
-            // grant — in the response body, so it has to be pulled out here.
-            $this->logger->error('GmailPushSubscriptionManager: watch failed, falling back to polling', [
-                'accountId' => $account->id,
-                'topic'     => ($this->pushSettings->topic() ?? ''),
-                'error'     => $e->getMessage(),
-                'exception' => $e,
-                'body'      => $e instanceof HttpExceptionInterface
-                    ? $e->getResponse()->getContent(false)
-                    : null,
+            $reason = $e instanceof \App\Domain\Exception\GmailApiException ? $e->getReason() : 'other';
+            $safeReason = in_array($reason, ['localCooldown', 'rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'RESOURCE_EXHAUSTED', 'forbidden', 'insufficientPermissions'], true) ? $reason : 'other';
+            if (null !== $this->attempt) { $this->attempt->reason = $safeReason; }
+            $this->logger->warning('Gmail watch registration failed', [
+                'accountId' => $account->id, 'method' => 'users.watch',
+                'source' => 'localCooldown' === $safeReason ? 'local' : ($e instanceof \App\Domain\Exception\GmailApiException ? 'remote' : 'unknown'),
+                'status' => $e instanceof \App\Domain\Exception\GmailApiException ? $e->getStatus() : null,
+                'reason' => $safeReason,
             ]);
 
             return false;

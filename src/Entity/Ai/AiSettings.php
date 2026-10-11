@@ -439,6 +439,7 @@ class AiSettings
      */
     public function enabledFor(AiFeature $feature): bool
     {
+        if (AiFeature::Search === $feature && false === $this->embeddingSpaceApproved()) { return false; }
         // The host THIS feature runs on, which is not always the same one:
         // search may have its own. A writing host on file does not make search
         // usable when search was pointed somewhere that was never filled in.
@@ -463,6 +464,41 @@ class AiSettings
             AiFeature::WritingHelp => $this->writingHelpEnabled,
             AiFeature::Summary     => $this->summaryEnabled,
         };
+    }
+
+    #[ORM\Column(name: 'embedding_revision', length: 64, nullable: true)]
+    public ?string $embeddingRevision = null;
+
+    #[ORM\Column(name: 'embedding_approved_space', length: 80, nullable: true)]
+    public ?string $embeddingApprovedSpace = null;
+
+    #[ORM\Column(name: 'embedding_reindex_required', options: ['default' => false])]
+    public bool $embeddingReindexRequired = false;
+
+    public function embeddingSpace(): string
+    {
+        $connection = $this->connectionFor(AiFeature::Search);
+        return \App\Domain\Ai\EmbeddingSpace::identity($connection->provider->value, $connection->baseUrl, $this->embeddingModel, $this->embeddingRevision);
+    }
+
+    /** Preserve the deployed fork's summary cache key across this upgrade. */
+    public function generationIdentity(): string
+    {
+        return hash('sha256', $this->provider->value . "\0" . rtrim((string) $this->baseUrl, '/') . "\0" . (string) $this->chatModel);
+    }
+
+    public function acceptsEmbeddingWidth(int $width): bool
+    {
+        if (null === $this->embeddingDimensions || $this->embeddingDimensions === $width) { return true; }
+        $this->embeddingRevision = hash('sha256', (string) $this->embeddingRevision . ':width:' . $width);
+        $this->embeddingReindexRequired = true;
+        return false;
+    }
+
+    public function embeddingSpaceApproved(): bool
+    {
+        return false === $this->embeddingReindexRequired
+            && (null === $this->embeddingApprovedSpace || $this->embeddingApprovedSpace === $this->embeddingSpace());
     }
 
     /**

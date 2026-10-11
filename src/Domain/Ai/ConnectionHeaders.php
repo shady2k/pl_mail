@@ -17,12 +17,11 @@ namespace App\Domain\Ai;
  * tenant by header. None of those is exotic for a self-hosted installation, and
  * without this every one of them is "plMail cannot be used with …".
  *
- * WHAT IT IS NOT
- * ──────────────
- * Fixed values only. There is no header whose value plMail invents per request
- * — a session id, a trace id — because nothing plMail does needs one and every
- * such header is a mechanism to carry through the queue for the benefit of one
- * endpoint.
+ * TASK HEADERS
+ * ────────────
+ * Values are fixed unless exactly {task_session_id}. That marker carries one
+ * stable identifier through a queued task and its retries, for gateways that
+ * group requests by task. Legacy fork session headers decode to this marker.
  *
  * TYPED AS TEXT, ONE PER LINE
  * ───────────────────────────
@@ -173,6 +172,7 @@ final class ConnectionHeaders
         $headers = [];
 
         foreach ($decoded as $name => $value) {
+            if (['mode' => 'session'] === $value) { $value = '{task_session_id}'; }
             if (false === is_string($name) || false === is_string($value)) {
                 continue;
             }

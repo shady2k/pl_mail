@@ -73,7 +73,7 @@ final readonly class MessageEmbedder
 
         $settings = $this->settings->currentOrDefault();
 
-        $model  = (string) $settings->embeddingModel;
+        $model  = $settings->embeddingSpace();
         $stored = 0;
 
         foreach ($messages as $message) {
@@ -93,6 +93,12 @@ final readonly class MessageEmbedder
                 continue;
             }
 
+            $this->entityManager->refresh($settings);
+            if ($model !== $settings->embeddingSpace() || false === $settings->embeddingSpaceApproved()) { return $stored; }
+            if (false === $settings->acceptsEmbeddingWidth(count($vector))) {
+                $this->entityManager->flush();
+                return $stored;
+            }
             if (true === $this->store->store((int) $id, $vector, $model)) {
                 ++$stored;
             }

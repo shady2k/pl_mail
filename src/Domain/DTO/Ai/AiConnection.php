@@ -66,7 +66,7 @@ final readonly class AiConnection
      *
      * @return array<string, string>
      */
-    public function requestHeaders(): array
+    public function requestHeaders(?string $taskId = null): array
     {
         $headers = [];
 
@@ -75,6 +75,10 @@ final readonly class AiConnection
         }
 
         foreach ($this->headers as $name => $value) {
+            if ('{task_session_id}' === $value) {
+                $taskId ??= \Symfony\Component\Uid\Uuid::v4()->toRfc4122();
+                $value = $taskId;
+            }
             foreach (array_keys($headers) as $existing) {
                 if (0 === strcasecmp($existing, $name)) {
                     unset($headers[$existing]);

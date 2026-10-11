@@ -42,6 +42,7 @@ final class AccountPushController extends AbstractController
         private readonly PushStatusFactory        $statusFactory,
         private readonly EntityManagerInterface   $em,
         private readonly TranslatorInterface      $translator,
+        private readonly ?\App\Service\Gmail\GmailPushAttempt $gmailAttempt = null,
     ) {}
 
     #[Route('/settings/accounts/{id}/push', name: 'settings_account_push_toggle', methods: ['POST'])]
@@ -150,7 +151,7 @@ final class AccountPushController extends AbstractController
         $status = $this->statusFactory->build($account);
 
         if (true === $failed) {
-            $status = $status->withFailure();
+            $status = $status->withFailure($account->isGmail() && 'localCooldown' === $this->gmailAttempt?->reason ? 'local_cooldown' : null);
         }
 
         // Every frame-targeted post comes from the accounts list's row

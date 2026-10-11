@@ -54,13 +54,16 @@ final readonly class SyncGmailMessageBatchHandler
         private MessageCategorizer      $categorizer,
         private MessageThreader         $messageThreader,
         private SyncOrigin              $origin,
+        private ?\App\Service\Gmail\GmailFetchState $fetchState = null,
     ) {}
 
     public function __invoke(SyncGmailMessageBatchMessage $message): void
     {
         // Everything stored from here on is marked with what started this
         // sync. See SyncOrigin, and SyncAccountMessage for the `??`.
-        $this->origin->during($message->trigger ?? null, fn () => $this->handle($message));
+        $work = fn () => $this->origin->during($message->trigger ?? null, fn () => $this->handle($message));
+        if (null === $this->fetchState) { $work(); return; }
+        $this->fetchState->withAccountLock($message->accountId, $work);
     }
 
     private function handle(SyncGmailMessageBatchMessage $message): void
@@ -91,11 +94,16 @@ final readonly class SyncGmailMessageBatchHandler
         // returned before fetching anything. A label change in Gmail, read
         // state included, reached this handler and stopped here.
         //
-        // Idempotency does not depend on this filter and never did: the loop
-        // below looks each id up before building, and enriches when it finds a
-        // row. A redelivered batch therefore costs one re-fetch and updates
-        // instead of inserting, which is what it should always have done.
-        $toFetch = array_values($message->gmailIds);
+        // The row lookup below preserves legitimate label refreshes. The shared
+        // completion ledger additionally skips redelivered revisions before HTTP.
+        // Legacy envelopes have no revision: refresh once at the current cursor,
+        // rather than dropping stored IDs and losing legitimate label updates.
+        if (null !== $this->fetchState) { $this->em->refresh($account); }
+        $revision = $message->historyRevision ?? $account->gmailHistoryId ?? '0';
+        $toFetch = array_values(array_unique($message->gmailIds));
+        if (null !== $this->fetchState) {
+            $toFetch = $this->fetchState->wanted((int) $account->id, $toFetch, $revision);
+        }
 
         if (count($toFetch) === 0) {
             return;
@@ -127,8 +135,8 @@ final readonly class SyncGmailMessageBatchHandler
                 ]);
             } else {
                 $this->bus->dispatch(
-                    new SyncGmailMessageBatchMessage($account->id, $fetch['retryable'], $this->origin->current(), $attempt + 1),
-                    true === $account->needsBackfill()
+                    new SyncGmailMessageBatchMessage($account->id, $fetch['retryable'], $this->origin->current(), $attempt + 1, $revision, $message->importQueue ?? false),
+                    true === ($message->importQueue ?? false)
                         ? [new DelayStamp($delay), new TransportNamesStamp([GmailApiSyncer::IMPORT_QUEUE])]
                         : [new DelayStamp($delay)],
                 );
@@ -141,6 +149,7 @@ final readonly class SyncGmailMessageBatchHandler
         /** @var array<int, Account> $affectedAccounts */
         $affectedAccounts = [];
         $enriched         = 0;
+        $failedBuildIds   = [];
 
         foreach ($payloads as $payload) {
             $labelIds = array_values(array_map('strval', $payload['labelIds'] ?? []));
@@ -228,6 +237,7 @@ final readonly class SyncGmailMessageBatchHandler
 
                 $affectedAccounts[(int) $targetAccount->id] = $targetAccount;
             } catch (\Throwable $e) {
+                $failedBuildIds[] = $gmailId;
                 $this->logger->error('SyncGmailMessageBatch: build failed', [
                     'gmailId'   => '' !== $gmailId ? $gmailId : '(unknown)',
                     'error'     => $e->getMessage(),
@@ -237,6 +247,7 @@ final readonly class SyncGmailMessageBatchHandler
         }
 
         if (count($built) === 0 && 0 === $enriched) {
+            $this->fetchState?->complete((int) $account->id, array_values(array_diff(array_merge(array_keys($payloads), $fetch['confirmedGone'] ?? []), $failedBuildIds)), $revision);
             if ($retryExhausted) { throw new \Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException('Gmail partial fetch retry budget exhausted; mail remains incomplete.'); }
             return;
         }
@@ -267,6 +278,7 @@ final readonly class SyncGmailMessageBatchHandler
         foreach ($affectedAccounts as $affectedAccount) {
             $this->syncNotifier->publishAccountSynced($affectedAccount);
         }
+        $this->fetchState?->complete((int) $account->id, array_values(array_diff(array_merge(array_keys($payloads), $fetch['confirmedGone'] ?? []), $failedBuildIds)), $revision);
         if ($retryExhausted) { throw new \Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException('Gmail partial fetch retry budget exhausted; mail remains incomplete.'); }
     }
 

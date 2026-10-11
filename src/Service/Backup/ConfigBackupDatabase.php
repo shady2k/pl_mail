@@ -267,6 +267,9 @@ final readonly class ConfigBackupDatabase
             'embeddingModel'        => $settings->embeddingModel,
             'embeddingKeepAlive'    => $settings->embeddingKeepAlive,
             'embeddingDimensions'   => $settings->embeddingDimensions,
+            'embeddingRevision' => $settings->embeddingRevision,
+            'embeddingApprovedSpace' => $settings->embeddingApprovedSpace,
+            'embeddingReindexRequired' => $settings->embeddingReindexRequired,
             'searchEnabled'         => $settings->searchEnabled,
             'categorisationEnabled' => $settings->categorisationEnabled,
             'holdUntilClassified'   => $settings->holdUntilClassified,
@@ -321,6 +324,24 @@ final readonly class ConfigBackupDatabase
      */
     public function restoreAiSettings(array $values): void
     {
+        // Read backups made by the deployed fork through upstream's connection DTO.
+        if (isset($values['chatProvider']) && !isset($values['provider'])) {
+            if (false === ($values['embeddingSharedConnection'] ?? false) && 'ollama' === ($values['embeddingProvider'] ?? 'ollama')) {
+                $values['embeddingBaseUrl'] ??= $values['baseUrl'] ?? null;
+                if (($values['embeddingBaseUrl'] ?? null) === ($values['baseUrl'] ?? null)) {
+                    $values['embeddingApiToken'] ??= $values['apiToken'] ?? null;
+                }
+            }
+            $values['provider'] = $values['chatProvider'];
+            if ('openai' === $values['chatProvider']) {
+                $values['baseUrl'] = $values['openAiBaseUrl'] ?? null;
+                $values['apiToken'] = $values['openAiApiToken'] ?? null;
+                $values['chatModel'] = $values['openAiModel'] ?? null;
+                $values['headers'] = json_decode((string) ($values['openAiHeaders'] ?? ''), true);
+            }
+            $values['embeddingOwnConnection'] = !($values['embeddingSharedConnection'] ?? false);
+            $values['embeddingHeaders'] = json_decode((string) ($values['embeddingHeaders'] ?? ''), true);
+        }
         $settings = $this->aiSettings->current() ?? new AiSettings();
 
         $settings->isEnabled             = true === ($values['isEnabled'] ?? false);
@@ -352,6 +373,9 @@ final readonly class ConfigBackupDatabase
         $settings->chatKeepAlive         = KeepAlive::normalised($this->string($values, 'chatKeepAlive'));
         $settings->embeddingKeepAlive    = KeepAlive::normalised($this->string($values, 'embeddingKeepAlive'));
         $settings->embeddingDimensions   = is_int($values['embeddingDimensions'] ?? null) ? $values['embeddingDimensions'] : null;
+        $settings->embeddingRevision = $this->string($values, 'embeddingRevision');
+        $settings->embeddingApprovedSpace = $this->string($values, 'embeddingApprovedSpace');
+        $settings->embeddingReindexRequired = true === ($values['embeddingReindexRequired'] ?? false);
         $settings->searchEnabled         = true === ($values['searchEnabled'] ?? false);
         $settings->categorisationEnabled = true === ($values['categorisationEnabled'] ?? false);
         // Absent from every backup taken before these existed, and absent has

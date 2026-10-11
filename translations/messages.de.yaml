@@ -158,7 +158,7 @@ admin:
             embedding_provider: 'Anbieter des Such-Hosts'
             headers: 'Zusätzliche Header'
             headers_clear: 'Gespeicherte Header entfernen'
-            headers_help: 'Einer pro Zeile, geschrieben Name: Wert. Gehen mit jeder Anfrage an den Modell-Host, für einen Proxy oder ein Gateway, das mehr als ein Token verlangt. Verschlüsselt gespeichert und nie wieder angezeigt.'
+            headers_help: 'Einer pro Zeile, geschrieben Name: Wert. Gehen mit jeder Anfrage an den Modell-Host, für einen Proxy oder ein Gateway, das mehr als ein Token verlangt. Verschlüsselt gespeichert und nie wieder angezeigt. Verwende {task_session_id} als ganzen Wert für eine stabile Kennung einer Aufgabe einschließlich ihrer Wiederholungen.'
             headers_help_set: 'Hinterlegt: %names%. Leer lassen, um sie zu behalten. Was du hier eintippst, ersetzt alle; die gespeicherten Werte werden nie angezeigt.'
             provider: 'Anbieter'
             provider_help: 'Welche API der Modell-Host spricht. Über Ollama weiß plMail am meisten: Es kann ein Modell geladen halten und eines vorab laden. OpenAI-kompatibel deckt fast alles andere ab, im eigenen Netz oder gehostet.'
@@ -4293,3 +4293,8 @@ gmail_sync:
     incomplete_mail: Gespeicherte Nachrichten bleiben verfügbar. Neue Nachrichten und ein leerer Posteingang können unvollständig sein.
     last_success: 'Letzte erfolgreiche Synchronisierungsplanung: %when%'
     retry_not_before: 'Bekannte Wartefrist bis mindestens %when%. Das ist keine Zusage, wann neue Mail erscheint.'
+
+admin.ai.embedding.confirm_change: 'Die Suchverbindung oder Vektorbreite hat sich geändert. Prüfe die gespeicherte Verbindung, bevor du einen neuen Index bestätigst. Die Bestätigung startet keine Indexierung.'
+admin.ai.embedding.approve_change: 'Neuen Suchindex bestätigen'
+
+settings.accounts.push.failed.local_cooldown: 'Die Gmail-Push-Registrierung wartet auf die lokale Quotenpause. Es wurde keine Anfrage an Google gesendet. Versuche es nach der Pause erneut.'

@@ -90,8 +90,10 @@ final readonly class BackfillEmbeddingsHandler
 
     public function __invoke(BackfillEmbeddingsMessage $message): void
     {
+        if (null !== ($message->spaceIdentity ?? null) && $message->spaceIdentity !== $this->settings->currentOrDefault()->embeddingSpace()) { return; }
         $now = new DateTimeImmutable();
         $run = $this->state->current();
+        if (null !== ($message->runId ?? null) && $message->runId !== $run->runId) { return; }
 
         // Asked every chunk, so Pause in the admin panel stops the walk within
         // one chunk rather than at the end of a mailbox — and so does a run
@@ -192,13 +194,13 @@ final readonly class BackfillEmbeddingsHandler
 
             $this->logger->info('BackfillEmbeddings: finished a mailbox', [
                 'userId'   => $message->userId,
-                'embedded' => $this->store->countFor((string) $this->settings->currentOrDefault()->embeddingModel),
+                'embedded' => $this->store->countFor($this->settings->currentOrDefault()->embeddingSpace()),
             ]);
 
             return;
         }
 
-        $model   = (string) $this->settings->currentOrDefault()->embeddingModel;
+        $model   = $this->settings->currentOrDefault()->embeddingSpace();
         $done    = $this->store->alreadyStored($ids, $model);
         $pending = array_values(array_diff($ids, $done));
         $stored  = 0;
@@ -264,7 +266,7 @@ final readonly class BackfillEmbeddingsHandler
      */
     private function postNext(int $userId, ?int $afterMessageId, int $delayMs): void
     {
-        $envelope = new BackfillEmbeddingsMessage($userId, $afterMessageId);
+        $envelope = new BackfillEmbeddingsMessage($userId, $afterMessageId, $this->state->current()->runId, $this->settings->currentOrDefault()->embeddingSpace());
 
         $this->bus->dispatch(
             $envelope,

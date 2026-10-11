@@ -78,6 +78,7 @@ final class AiSettingsController extends AbstractController
         // to the DOCUMENT url, and this renders inside a Turbo Frame — so the
         // POST would go to /admin?section=ai and quietly do nothing. The trap
         // PushSettingsController and IntegrationProviderController both record.
+        $oldSpace = $settings->embeddingSpace();
         $form = $this->form($settings);
         $form->handleRequest($request);
 
@@ -96,6 +97,9 @@ final class AiSettingsController extends AbstractController
             // spellings. A second pass would imply the first cannot be trusted.
             // The writer that DOES need it is the config restore, which reads a
             // file rather than a validated form; see ConfigBackupDatabase.
+            if ($oldSpace !== $settings->embeddingSpace()) {
+                $settings->embeddingReindexRequired = true;
+            }
             $this->entityManager->persist($settings);
             $this->entityManager->flush();
 
@@ -114,6 +118,21 @@ final class AiSettingsController extends AbstractController
             'prompts'  => $this->promptRows(),
             'hold'     => $this->holdDelay(),
         ]);
+    }
+
+    #[Route('/embedding/approve', name: 'embedding_approve', methods: ['POST'])]
+    public function approveEmbedding(Request $request): Response
+    {
+        if (false === $this->isCsrfTokenValid('ai-embedding-approve', $request->request->getString('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+        $settings = $this->settings->currentOrDefault();
+        $this->backfill->pause();
+        $settings->embeddingApprovedSpace = $settings->embeddingSpace();
+        $settings->embeddingReindexRequired = false;
+        $settings->embeddingDimensions = null;
+        $this->entityManager->flush();
+        return $this->redirectToRoute('app_admin_ai_settings');
     }
 
     /**

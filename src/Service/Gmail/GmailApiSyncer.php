@@ -53,6 +53,7 @@ final class GmailApiSyncer
         private readonly LoggerInterface        $logger,
         private readonly MessageEraser          $eraser,
         private readonly SyncOrigin             $origin,
+        private readonly ?GmailFetchState       $fetchState = null,
     ) {}
 
     /**
@@ -67,6 +68,15 @@ final class GmailApiSyncer
      * instead of being written off as complete.
      */
     public function initialSync(Account $account): void
+    {
+        if (null === $this->fetchState) { $this->doInitialSync($account); return; }
+        $this->fetchState->withAccountLock((int) $account->id, function () use ($account): void {
+            $this->em->refresh($account);
+            $this->doInitialSync($account);
+        });
+    }
+
+    private function doInitialSync(Account $account): void
     {
         $profile          = $this->apiClient->getProfile($account);
         $currentHistoryId = (string) ($profile['historyId'] ?? '');
@@ -112,6 +122,15 @@ final class GmailApiSyncer
      */
     public function beginImport(Account $account): void
     {
+        if (null === $this->fetchState) { $this->doBeginImport($account); return; }
+        $this->fetchState->withAccountLock((int) $account->id, function () use ($account): void {
+            $this->em->refresh($account);
+            $this->doBeginImport($account);
+        });
+    }
+
+    private function doBeginImport(Account $account): void
+    {
         $profile          = $this->apiClient->getProfile($account);
         $currentHistoryId = (string) ($profile['historyId'] ?? '');
 
@@ -135,11 +154,19 @@ final class GmailApiSyncer
      * first. One extra request asks for the Inbox by name, and its messages
      * are on the queue before the first page of the rest.
      *
-     * They turn up again in the listing that follows and are queued a second
-     * time. That is left alone: by then they are stored, and a batch of
-     * stored ids is one lookup and no fetch.
+     * The same IDs can turn up in the next page before any batch has run.
+     * Durable reservations prevent that overlap from dispatching twice.
      */
     public function importInboxFirst(Account $account): void
+    {
+        if (null === $this->fetchState) { $this->doImportInboxFirst($account); return; }
+        $this->fetchState->withAccountLock((int) $account->id, function () use ($account): void {
+            $this->em->refresh($account);
+            $this->doImportInboxFirst($account);
+        });
+    }
+
+    private function doImportInboxFirst(Account $account): void
     {
         $listed = $this->apiClient->listMessagesPage($account, [
             'maxResults' => self::INBOX_SLICE,
@@ -160,6 +187,15 @@ final class GmailApiSyncer
      * @param bool $toImportQueue false only for backfill() above
      */
     public function backfillPage(Account $account, bool $toImportQueue = true): GmailBackfillStep
+    {
+        if (null === $this->fetchState) { return $this->doBackfillPage($account, $toImportQueue); }
+        return $this->fetchState->withAccountLock((int) $account->id, function () use ($account, $toImportQueue): GmailBackfillStep {
+            $this->em->refresh($account);
+            return $this->doBackfillPage($account, $toImportQueue);
+        });
+    }
+
+    private function doBackfillPage(Account $account, bool $toImportQueue): GmailBackfillStep
     {
         if (false === $account->needsBackfill()) {
             return GmailBackfillStep::Finished;
@@ -265,6 +301,15 @@ final class GmailApiSyncer
      * messages, and advance the stored historyId.
      */
     public function syncIncremental(Account $account): void
+    {
+        if (null === $this->fetchState) { $this->doSyncIncremental($account); return; }
+        $this->fetchState->withAccountLock((int) $account->id, function () use ($account): void {
+            $this->em->refresh($account);
+            $this->doSyncIncremental($account);
+        });
+    }
+
+    private function doSyncIncremental(Account $account): void
     {
         $startHistoryId = $account->gmailHistoryId;
 
@@ -454,7 +499,7 @@ final class GmailApiSyncer
             $wanted[] = (string) $gmailId;
         }
 
-        $this->dispatchBatches($account, array_values(array_unique($wanted)));
+        $this->dispatchBatches($account, array_values(array_unique($wanted)), false, (string) $result['historyId']);
 
         $account->gmailHistoryId = (string) $result['historyId'];
 
@@ -586,12 +631,23 @@ final class GmailApiSyncer
     /**
      * @param list<string> $gmailIds
      */
-    private function dispatchBatches(Account $account, array $gmailIds, bool $toImportQueue = false): void
+    private function dispatchBatches(Account $account, array $gmailIds, bool $toImportQueue = false, string $revision = '0'): void
     {
         if (count($gmailIds) === 0) {
             return;
         }
 
+        if (null !== $this->fetchState) {
+            $this->fetchState->enqueue((int) $account->id, $gmailIds, $revision,
+                fn (array $reserved) => $this->sendBatches($account, $reserved, $toImportQueue, $revision));
+            return;
+        }
+        $this->sendBatches($account, array_values(array_unique($gmailIds)), $toImportQueue, $revision);
+    }
+
+    /** @param list<string> $gmailIds */
+    private function sendBatches(Account $account, array $gmailIds, bool $toImportQueue, string $revision): void
+    {
         $batches = array_chunk($gmailIds, self::BATCH_SIZE);
 
         foreach ($batches as $batch) {
@@ -604,6 +660,9 @@ final class GmailApiSyncer
                     (int) $account->id,
                     $batch,
                     $this->origin->current(),
+                    0,
+                    $revision,
+                    $toImportQueue,
                 ),
                 true === $toImportQueue ? [new TransportNamesStamp([self::IMPORT_QUEUE])] : [],
             );

@@ -27,11 +27,11 @@ final class Version20261011120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE ai_settings ADD embedding_own_connection BOOLEAN DEFAULT FALSE NOT NULL');
-        $this->addSql("ALTER TABLE ai_settings ADD embedding_provider VARCHAR(16) DEFAULT 'ollama' NOT NULL");
-        $this->addSql('ALTER TABLE ai_settings ADD embedding_base_url VARCHAR(255) DEFAULT NULL');
-        $this->addSql('ALTER TABLE ai_settings ADD embedding_api_token TEXT DEFAULT NULL');
-        $this->addSql('ALTER TABLE ai_settings ADD embedding_headers TEXT DEFAULT NULL');
+        $this->addSql('ALTER TABLE ai_settings ADD IF NOT EXISTS embedding_own_connection BOOLEAN DEFAULT FALSE NOT NULL');
+        $this->addSql("ALTER TABLE ai_settings ADD IF NOT EXISTS embedding_provider VARCHAR(16) DEFAULT 'ollama' NOT NULL");
+        $this->addSql('ALTER TABLE ai_settings ADD IF NOT EXISTS embedding_base_url VARCHAR(255) DEFAULT NULL');
+        $this->addSql('ALTER TABLE ai_settings ADD IF NOT EXISTS embedding_api_token TEXT DEFAULT NULL');
+        $this->addSql('ALTER TABLE ai_settings ADD IF NOT EXISTS embedding_headers TEXT DEFAULT NULL');
     }
 
     public function down(Schema $schema): void
