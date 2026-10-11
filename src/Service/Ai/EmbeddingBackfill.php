@@ -218,6 +218,8 @@ final readonly class EmbeddingBackfill
             return self::NOTHING_TO_RESUME;
         }
 
+        // Resume rotates the generation to fence an old in-flight chain.
+        $run = $this->state->current();
         foreach ($pending as $userId) {
             $this->bus->dispatch(new BackfillEmbeddingsMessage($userId, $run->cursorFor($userId), $run->runId, $this->settings->currentOrDefault()->embeddingSpace()));
         }

@@ -130,6 +130,30 @@ final class BackfillYieldsToInteractiveWorkTest extends KernelTestCase
         self::assertSame(900, $this->state->current()->cursorFor(1));
     }
 
+    public function testResumeDispatchesTheNewGenerationAtThePreservedCursor(): void
+    {
+        $container = self::getContainer();
+        $user = $container->get(\App\Repository\User\UserRepository::class)->findOneBy(['email' => 'e2e@plmail.test']);
+        self::assertNotNull($user);
+        $now = new DateTimeImmutable();
+        $space = $container->get(\App\Repository\Ai\AiSettingsRepository::class)->currentOrDefault()->embeddingSpace();
+        $this->state->begin($space, [(int) $user->id], $now);
+        $this->state->recordChunk((int) $user->id, 500, false, 0, $now);
+        $oldId = $this->state->current()->runId;
+        $this->state->pause(BackfillPauseReason::Operator, $now);
+        self::assertSame('resumed', $container->get(\App\Service\Ai\EmbeddingBackfill::class)->resume());
+        $sent = $this->queue()->getSent();
+        self::assertCount(1, $sent);
+        $message = $sent[0]->getMessage();
+        self::assertInstanceOf(BackfillEmbeddingsMessage::class, $message);
+        self::assertNotSame($oldId, $message->runId);
+        self::assertSame($this->state->current()->runId, $message->runId);
+        self::assertSame(500, $message->afterMessageId);
+        $container->get(InteractiveAiActivity::class)->touch($now);
+        ($this->handler)($message);
+        self::assertCount(2, $this->queue()->getSent(), 'The resumed generation must pass the handler guard');
+    }
+
     private function queue(): InMemoryTransport
     {
         $transport = self::getContainer()->get('messenger.transport.maintenance');
